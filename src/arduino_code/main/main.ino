@@ -3,7 +3,7 @@
 
 #define SENSOR_ON
 
-// #define DEBUG
+#define DEBUG
 
 #ifdef DEBUG
  #define debug_print(x)  Serial.println (x)
@@ -16,7 +16,7 @@
 #define NUM_STRIPS 6
 #define NUM_LEDS 60
 
-#define NUM_FEET_STRIPS 1
+#define NUM_FEET_STRIPS 2
 #define NUM_FEET_LEDS 42
 
 
@@ -29,11 +29,13 @@
 #define STRIP6 7
 
 #define FEET_STRIP1 8
+#define FEET_STRIP2 9
 
 #define ARRAY_SIZE(A) (sizeof(A) / sizeof((A)[0]))
 
-int lightThresholdOne = 40;
-int lightThresholdTwo = 40;
+int lightThresholdOne = 2;
+int lightThresholdTwo = 2;
+
 int sensorPinOne = A0;
 int sensorPinTwo = A1;
 
@@ -43,7 +45,7 @@ int two_high = 21;
 int two_low = 20;
 
 CRGB leds[NUM_STRIPS][NUM_LEDS];
-CRGB feets[NUM_FEET_STRIPS][NUM_FEET_LEDS]
+CRGB feets[NUM_FEET_STRIPS][NUM_FEET_LEDS];
 
 uint8_t gHue = 0;
 bool newSensorValue;
@@ -78,16 +80,20 @@ void setup()
     FastLED.addLeds<NEOPIXEL, STRIP5>(leds[4], NUM_LEDS);
     FastLED.addLeds<NEOPIXEL, STRIP6>(leds[5], NUM_LEDS);
 
-    FastLED.addLeds<NEOPIXEL, FEET_STRIP1>(feets[0], NUM_LEDS);
+    FastLED.addLeds<NEOPIXEL, FEET_STRIP1>(feets[0], NUM_FEET_LEDS);
+    FastLED.addLeds<NEOPIXEL, FEET_STRIP2>(feets[1], NUM_FEET_LEDS);
 
-    randomSeed(analogRead(4));
+    randomSeed(analogRead(5));
+    debug_print("setup done");
 }
 
 
 void loop() 
 {
-
-    newSensorValue = read_sensors();
+    uint8_t sensor_values[2];
+    read_sensors(sensor_values);
+    control_feet(sensor_values);
+    newSensorValue = decide_value(sensor_values);
     
     if(newSensorValue == true && previousSensorValue == false)
     {
@@ -113,6 +119,36 @@ void loop()
 
     EVERY_N_SECONDS( 10 ) { nextPattern(); } // change patterns periodically
 
+}
+
+void control_feet(uint8_t sensor_values[])
+{
+  for(int i=0; i < NUM_FEET_STRIPS; i++)
+  {
+    if(sensor_values[i] == 1)
+    {
+      active_foot(i);
+    }
+    else
+    {
+      inactive_foot(i);
+    } 
+  }  
+}
+
+void active_foot(uint8_t strip)
+{
+  fadeToBlackBy(feets[strip], NUM_FEET_LEDS, 20);
+  int pos = beatsin16( 13, 0, NUM_FEET_LEDS-1 );
+  feets[strip][pos] += CHSV( gHue, 255, 192);
+  gHue++;
+}
+
+void inactive_foot(uint8_t strip)
+{
+  fadeToBlackBy(feets[strip], NUM_FEET_LEDS, 20);
+  int pos = beatsin16( 13, 0, NUM_FEET_LEDS-1 );
+  feets[strip][pos] = CRGB::Red;
 }
 
 void ligths_on()
@@ -181,53 +217,55 @@ void juggle() {
 }
 
 
-int read_sensor_one()
+uint8_t read_sensor_one()
 {
-  #ifdef SENSOR_ON
-    int sensorValue = analogRead(sensorPinOne);
-  #else
-    int sensorValue = lightThresholdOne - 1;
-  #endif
+  int sensorValue = analogRead(sensorPinOne);
+  debug_print(sensorValue);
 
   if(sensorValue < lightThresholdOne)
   {
-    return true;  
+    return 1;  
   }
-  return false;  
+  return 0;  
 }
 
 
-
-int read_sensor_two()
+uint8_t read_sensor_two()
 {
-  #ifdef SENSOR_ON
-    int sensorValue = analogRead(sensorPinTwo);
-  #else
-    int sensorValue = lightThresholdTwo - 1;
-    debug_print(sensorValue);
-  #endif
+
+   int sensorValue = analogRead(sensorPinTwo);
+   debug_print(sensorValue);
 
   if(sensorValue < lightThresholdTwo)
   {
-    return true;  
+    return 1;  
   }
-  return false;
+  return 0;
 }
 
 
 
 
-int read_sensors()
+void read_sensors(uint8_t sensor_values[])
 {
   
-  bool value_one = read_sensor_one();
-  bool value_two = read_sensor_two();
+  uint8_t value_one = read_sensor_one();
+  uint8_t value_two = read_sensor_two();
 
-  if(value_one == true && value_two == true)
+  sensor_values[0] = value_one;
+  sensor_values[1] = value_two;
+
+}
+
+uint8_t decide_value(uint8_t values[])
+{
+  uint8_t value_one = values[0];
+  uint8_t value_two = values[1];
+  if(value_one == 1 && value_two == 1)
   {
-    return true;
+    return 1;
   }
-  return false;
+  return 0;
 }
 
 
