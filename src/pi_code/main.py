@@ -7,8 +7,8 @@ ser = serial.Serial('/dev/ttyACM0', 250000)
 
 
 class BootsOnBooth:
-    music_folder = os.path.abspath(os.path.join('..', '..', '..', 'music'))
-
+    music_folder = os.path.abspath(os.path.join(__file__, '..', '..', '..', '..', 'music'))
+    print('Music folder: ' + music_folder)
     songs = list()
     number_of_songs = 0
     song_index = 11
@@ -103,6 +103,7 @@ class BootsOnBooth:
     def sensor_input(self):
         if ser.in_waiting > 0:
             line = ser.readline().strip()
+            print("Line: " + str(line))
             if line == '1':
                 print("Boots are in position")
                 self.increase_number_of_plays()

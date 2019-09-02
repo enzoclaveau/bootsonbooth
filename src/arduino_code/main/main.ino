@@ -16,9 +16,10 @@
 #define NUM_STRIPS 6
 #define NUM_LEDS 60
 
-#define NUM_FEET_STRIPS 2
+#define NUM_FEET_STRIPS 4
 #define NUM_FEET_LEDS 42
 
+#define NUM_SENSORS 4
 
 // LEDS STRIP PINS
 #define STRIP1 2
@@ -30,14 +31,20 @@
 
 #define FEET_STRIP1 8
 #define FEET_STRIP2 9
+#define FEET_STRIP3 10
+#define FEET_STRIP4 11
 
 #define ARRAY_SIZE(A) (sizeof(A) / sizeof((A)[0]))
 
 int lightThresholdOne = 2;
 int lightThresholdTwo = 2;
+int lightThresholdThree = 2;
+int lightThresholdFour = 2;
 
 int sensorPinOne = A0;
 int sensorPinTwo = A1;
+int sensorPinThree = A2;
+int sensorPinFour = A3;
 
 int one_high = 1;
 int one_low = 0;
@@ -56,11 +63,16 @@ bool boots = false;
 void sinelon_reverse();
 void sinelon();
 void juggle();
+void continuous();
+void continous_reverse();
 
+#define SAW_TOOTH_SPEED 9
+#define INACTIVE_SAW_TOOTH_SPEED 6
+#define FADE_TO_BLACK_SPEED 20
 
 // List of patterns to cycle through.  Each is defined as a separate function below.
 typedef void (*SimplePatternList[])();
-SimplePatternList patterns = { sinelon_reverse, sinelon, juggle };
+SimplePatternList patterns = { continuous, continous_reverse,sinelon_reverse, sinelon, juggle };
 uint8_t currentPattern = 0;
 
 void setup() 
@@ -72,6 +84,8 @@ void setup()
     
     pinMode(sensorPinOne, INPUT);
     pinMode(sensorPinTwo, INPUT);
+    pinMode(sensorPinThree, INPUT);
+    pinMode(sensorPinFour, INPUT);
     
     FastLED.addLeds<NEOPIXEL, STRIP1>(leds[0], NUM_LEDS);
     FastLED.addLeds<NEOPIXEL, STRIP2>(leds[1], NUM_LEDS);
@@ -79,9 +93,11 @@ void setup()
     FastLED.addLeds<NEOPIXEL, STRIP4>(leds[3], NUM_LEDS);
     FastLED.addLeds<NEOPIXEL, STRIP5>(leds[4], NUM_LEDS);
     FastLED.addLeds<NEOPIXEL, STRIP6>(leds[5], NUM_LEDS);
-
+ 
     FastLED.addLeds<NEOPIXEL, FEET_STRIP1>(feets[0], NUM_FEET_LEDS);
     FastLED.addLeds<NEOPIXEL, FEET_STRIP2>(feets[1], NUM_FEET_LEDS);
+    FastLED.addLeds<NEOPIXEL, FEET_STRIP3>(feets[2], NUM_FEET_LEDS);
+    FastLED.addLeds<NEOPIXEL, FEET_STRIP4>(feets[3], NUM_FEET_LEDS);
 
     randomSeed(analogRead(5));
     debug_print("setup done");
@@ -90,20 +106,22 @@ void setup()
 
 void loop() 
 {
-    uint8_t sensor_values[2];
+    uint8_t sensor_values[NUM_SENSORS];
     read_sensors(sensor_values);
     control_feet(sensor_values);
     newSensorValue = decide_value(sensor_values);
     
     if(newSensorValue == true && previousSensorValue == false)
-    {
+    { 
+        debug_print("BOOTS");
         boots = true;
         send_to_pi(one_high);
     }
     else if(newSensorValue == false && previousSensorValue == true)
     {
+        debug_print("REMOVED");
         boots = false;
-        send_to_pi(one_low);
+        send_to_pi(0);
     }
 
     if(boots == true){
@@ -138,16 +156,18 @@ void control_feet(uint8_t sensor_values[])
 
 void active_foot(uint8_t strip)
 {
-  fadeToBlackBy(feets[strip], NUM_FEET_LEDS, 20);
-  int pos = beatsin16( 13, 0, NUM_FEET_LEDS-1 );
+  fadeToBlackBy(feets[strip], NUM_FEET_LEDS, FADE_TO_BLACK_SPEED);
+  //int pos = beatsin16( 13, 0, NUM_FEET_LEDS-1 );
+  int pos = beat8(SAW_TOOTH_SPEED) % NUM_FEET_LEDS;
   feets[strip][pos] += CHSV( gHue, 255, 192);
   gHue++;
 }
 
 void inactive_foot(uint8_t strip)
 {
-  fadeToBlackBy(feets[strip], NUM_FEET_LEDS, 20);
-  int pos = beatsin16( 13, 0, NUM_FEET_LEDS-1 );
+  fadeToBlackBy(feets[strip], NUM_FEET_LEDS, FADE_TO_BLACK_SPEED);
+  //int pos = beatsin16( 13, 0, NUM_FEET_LEDS-1 );
+  int pos = beat8(INACTIVE_SAW_TOOTH_SPEED) % NUM_FEET_LEDS;
   feets[strip][pos] = CRGB::Red;
 }
 
@@ -166,8 +186,7 @@ void nextPattern()
 void sinelon()
 {
   // a colored dot sweeping back and forth, with fading trails
-    fadeAllStripsToBlackBy(20);
-    int pos = beatsin16( 13, 0, NUM_LEDS-1 );
+    fadeAllStripsToBlackBy(FADE_TO_BLACK_SPEED);
 
     for(int i=0; i<NUM_STRIPS; i++)
     { 
@@ -177,11 +196,42 @@ void sinelon()
     }
 }
 
+void continuous()
+{
+    fadeAllStripsToBlackBy(FADE_TO_BLACK_SPEED);
+
+    for(int i=0; i<NUM_STRIPS; i++)
+    { 
+        int pos = beat8(SAW_TOOTH_SPEED) % NUM_LEDS;
+        leds[i][pos] += CHSV( gHue, 255, 192);
+        gHue++;
+    }
+}
+
+void continous_reverse()
+{
+    fadeAllStripsToBlackBy(FADE_TO_BLACK_SPEED);
+  for(int i=0; i<NUM_STRIPS; i++)
+      { 
+          if(i % 2 == 0)
+          {
+            int pos = beat8(SAW_TOOTH_SPEED) % NUM_LEDS;
+            leds[i][pos] += CHSV( gHue, 255, 192);
+            gHue++;
+          }
+          else
+          {
+            int pos = beat8(SAW_TOOTH_SPEED) % NUM_LEDS;
+            leds[i][NUM_LEDS - pos] += CHSV( gHue, 255, 192);
+            gHue++;
+          }
+      }
+}
+
 void sinelon_reverse()
 {
   // a colored dot sweeping back and forth, with fading trails
-    fadeAllStripsToBlackBy(20);
-    int pos = beatsin16( 13, 0, NUM_LEDS-1 );
+    fadeAllStripsToBlackBy(FADE_TO_BLACK_SPEED);
 
     for(int i=0; i<NUM_STRIPS; i++)
     { 
@@ -196,14 +246,13 @@ void sinelon_reverse()
           int pos = beatsin16( 13, 0, NUM_LEDS -1);
           leds[i][NUM_LEDS - pos] += CHSV( gHue, 255, 192);
           gHue++;
-        }
-        
+        }   
     }
 }
 
 void juggle() {
     // eight colored dots, weaving in and out of sync with each other
-    fadeAllStripsToBlackBy(20);
+    fadeAllStripsToBlackBy(FADE_TO_BLACK_SPEED);
     byte dothue = 0;
 
     for( int i = 0; i < 8; i++) {
@@ -220,7 +269,6 @@ void juggle() {
 uint8_t read_sensor_one()
 {
   int sensorValue = analogRead(sensorPinOne);
-  debug_print(sensorValue);
 
   if(sensorValue < lightThresholdOne)
   {
@@ -229,12 +277,10 @@ uint8_t read_sensor_one()
   return 0;  
 }
 
-
 uint8_t read_sensor_two()
 {
 
    int sensorValue = analogRead(sensorPinTwo);
-   debug_print(sensorValue);
 
   if(sensorValue < lightThresholdTwo)
   {
@@ -243,33 +289,48 @@ uint8_t read_sensor_two()
   return 0;
 }
 
-
-
-
-void read_sensors(uint8_t sensor_values[])
+uint8_t read_sensor_three()
 {
-  
-  uint8_t value_one = read_sensor_one();
-  uint8_t value_two = read_sensor_two();
 
-  sensor_values[0] = value_one;
-  sensor_values[1] = value_two;
+   int sensorValue = analogRead(sensorPinThree);
 
+  if(sensorValue < lightThresholdThree)
+  {
+    return 1;  
+  }
+  return 0;
 }
 
-uint8_t decide_value(uint8_t values[])
+uint8_t read_sensor_four()
 {
-  uint8_t value_one = values[0];
-  uint8_t value_two = values[1];
-  if(value_one == 1 && value_two == 1)
+
+   int sensorValue = analogRead(sensorPinFour);
+
+  if(sensorValue < lightThresholdFour)
   {
-    return 1;
+    return 1;  
   }
   return 0;
 }
 
 
+void read_sensors(uint8_t sensor_values[])
+{
+  sensor_values[0] = read_sensor_one();
+  sensor_values[1] = read_sensor_two();
+  sensor_values[2] = read_sensor_three();
+  sensor_values[3] = read_sensor_four();
+}
 
+uint8_t decide_value(uint8_t values[])
+{
+  if(values[0] == 1 && values[1] == 1 && values[2] == 1 && values[3] == 1)
+  {
+    debug_print("all on");
+    return 1;
+  }
+  return 0;
+}
 
 
 void fadeAllStripsToBlackBy(int value)
