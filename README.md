@@ -1,5 +1,3 @@
-pi wachtwoord: moppie
-
 Commando om windows map te laden in Linux (zorg dat je een map boven Windows-Share zit:
 sudo mount.cifs //192.168.178.10/bootsonbooth Windows-Share
 
